@@ -35,17 +35,22 @@ public class FeedbackController : ControllerBase
 
 	[HttpGet]
 	[Route("")]
+	[Route("page={pageNumber}")]
 	[Route("page={pageNumber}&perPage={documentsLimitPerPage}")]
-	public Page Get(int pageNumber=1, int documentsLimitPerPage=10)
+	public Page Get(int pageNumber, int documentsLimitPerPage = 10)
 	{
-		var totalDocuments = _feedbackService.CountDocuments();//nefunguje strankovanie 
-		var documents = _feedbackService.GetLimitedDocuments(pageNumber, documentsLimitPerPage).ToList();
-		var page = new Page()
-		{
-			TotalDocuments = totalDocuments,
-			Documents = documents
-		};
-		return page;
+		long totalDocuments = _feedbackService.CountDocuments();
+		int documentsLimit = FilterValidator.NumberOfDocumentsPerPageValidator(documentsLimitPerPage);
+
+		int totalPages = FilterValidator.CountPages(totalDocuments, documentsLimit);
+		int page = FilterValidator.PageNumberValidator(pageNumber, totalPages);
+
+		bool isFirst = FilterValidator.IsFirst(pageNumber, totalPages);
+		bool isLast = FilterValidator.IsLast(pageNumber, totalPages);
+
+		var documents = _feedbackService.GetLimitedDocuments(page, documentsLimit).ToList();
+
+		return new Page(totalDocuments, isFirst, isLast, documents);
 	}
 
 	[HttpGet("{id:length(24)}")]
@@ -117,8 +122,9 @@ public class FeedBackService
 
 	public IEnumerable<FeedBackModel> GetLimitedDocuments(int pageNumber, int documentsLimitPerPage)
 	{
-		return _feedbacksCollection.Find(FeedBackModel => true).Skip(pageNumber<2?0:pageNumber*documentsLimitPerPage).Limit(documentsLimitPerPage)
-			.SortBy(feedback => feedback.Id).ToList();
+		int skipDocumentsCalculate = pageNumber == 1 ? 0 : (pageNumber * documentsLimitPerPage) - 1;
+		return _feedbacksCollection.Find(FeedBackModel => true).Skip(skipDocumentsCalculate).Limit(documentsLimitPerPage)
+			.SortByDescending(feedback => feedback.Id).ToList();
 	}
 
 	public FeedBackModel GetDocumentById(string id) =>
@@ -157,11 +163,44 @@ public class FeedBackModel
 	public required string Product { get; set; }
 	public required string Vendor { get; set; }
 }
-public class Page
+public class Page(long totalDocuments, bool IsFirst, bool IsLast, List<FeedBackModel> documents)
 {
-	public long TotalDocuments { get; set; }
-	public bool IsFirstPage { get; set; } = true;
-	public bool IsLastPage { get; set; } = true;
-	public List<FeedBackModel> Documents { get; set; } = [];
-
+	public long TotalDocuments { get; set; } = totalDocuments;
+	public bool IsFirstPage { get; set; } = IsFirst;
+	public bool IsLastPage { get; set; } = IsLast; 
+	public List<FeedBackModel> Documents { get; set; } = documents;
 }
+public static class FilterValidator
+{
+	public static int PageNumberValidator(int page, int totalPages)
+	{
+		int correctPage = 1;
+		if (page > totalPages)
+		{
+			correctPage = totalPages;
+		}
+		else if (page < 1)
+		{
+			correctPage = 1;
+		}
+		return correctPage;
+	}
+
+	public static int NumberOfDocumentsPerPageValidator(int documentsLimitPerPage)
+	{
+		int correctNumberOfDocuments = documentsLimitPerPage switch
+		{
+			> 20 => 20,
+			< 5 => 5,
+			_ => documentsLimitPerPage,
+		};
+		return correctNumberOfDocuments;
+
+	}
+
+	public static bool IsFirst(int pageNumber, int totalPages) => pageNumber == 1 || totalPages == 1;
+	public static bool IsLast(int pageNumber, int totalPages) => pageNumber >= totalPages;
+	public static int CountPages(long totalDocuments, int documentsLimit) => (int)Math.Ceiling((double)totalDocuments / documentsLimit);
+}
+//ked sa zada page vacsi ako pocetPage zobrazi sa posledna a ak je posledna zaroven prva musi byt atribut true a musia sa zobrazit aj dokumenty
+
