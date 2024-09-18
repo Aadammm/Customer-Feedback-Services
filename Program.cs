@@ -73,7 +73,7 @@ public class FeedbackController : ControllerBase
 		return NoContent();
 	}
 
-	[HttpDelete("{id:length(24)}}")]
+	[HttpDelete("{id:length(24)}")]
 	public async Task<IActionResult> Delete(string id)
 	{
 		var feedback = _feedbackService.GetByIdAsync(id);
@@ -139,14 +139,14 @@ public class FeedBackModel
 	public required string Product { get; set; }
 	public required string Vendor { get; set; }
 }
-public class Page
-{
-	public long TotalDocuments
-	{
-		get; set;
-	}
-	public bool IsFirstPage { get; set; }
-	public bool IsLastPage { get; set; }
-	public List<FeedBackModel> Documents { get; set; }
+//public class Page
+//{
+//	public long TotalDocuments
+//	{
+//		get; set;
+//	}
+//	public bool IsFirstPage { get; set; }
+//	public bool IsLastPage { get; set; }
+//	public List<FeedBackModel> Documents { get; set; }
 
-}
+//}
