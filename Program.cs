@@ -40,17 +40,17 @@ public class FeedbackController : ControllerBase
 	public PageResult Get(int pageNumber, int limitPerPage = 10)
 	{
 		long totalDocuments = _feedbackService.CountDocuments();
-		int documentsLimit = PaginationHelper.NumberOfDocumentsPerPageValidator(limitPerPage);
+		int documentsLimit = PaginationHelper.ValidateLimitPerPage(limitPerPage);
 
-		int totalPages = PaginationHelper.CountPages(totalDocuments, documentsLimit);
-		int page = PaginationHelper.PageNumberValidator(pageNumber, totalPages);
+		int totalPages = PaginationHelper.CalculateTotalPages(totalDocuments, documentsLimit);
+		int page = PaginationHelper.ValidatePageNumber(pageNumber, totalPages);
 
-		bool isFirst = PaginationHelper.IsFirst(pageNumber, totalPages);
-		bool isLast = PaginationHelper.IsLast(pageNumber, totalPages);
+		bool isFirst = PaginationHelper.IsFirstPage(pageNumber, totalPages);
+		bool isLast = PaginationHelper.IsLastPage(pageNumber, totalPages);
 
 		var documents = _feedbackService.GetLimitedDocuments(page, documentsLimit).ToList();
 
-		return new PageResult(totalDocuments, isFirst, isLast, documents) ;
+		return new PageResult(totalDocuments, isFirst, isLast, documents);
 	}
 
 	[HttpGet("{id:length(24)}")]
@@ -118,13 +118,16 @@ public class FeedbackService
 	}
 
 	public IEnumerable<FeedbackModel> GetDocuments() =>
-		 _feedbacksCollection.Find(FeedBackModel => true).ToList();
+		 _feedbacksCollection.Find(_ => true).ToList();
 
 	public IEnumerable<FeedbackModel> GetLimitedDocuments(int pageNumber, int documentsLimitPerPage)
 	{
-		int skipDocumentsCalculate = pageNumber == 1 ? 0 : (pageNumber * documentsLimitPerPage) - 1;
-		return _feedbacksCollection.Find(FeedBackModel => true).Skip(skipDocumentsCalculate).Limit(documentsLimitPerPage)
-			.SortByDescending(feedback => feedback.Id).ToList();
+		int skipDocuments = pageNumber == 1 ? 0 : (pageNumber * documentsLimitPerPage) - 1;
+		return _feedbacksCollection.Find(FeedBackModel => true)
+			.Skip(skipDocuments)
+			.Limit(documentsLimitPerPage)
+			.SortByDescending(feedback => feedback.Id)
+			.ToList();
 	}
 
 	public FeedbackModel GetDocumentById(string id) =>
@@ -167,12 +170,12 @@ public class PageResult(long totalDocuments, bool IsFirst, bool IsLast, List<Fee
 {
 	public long TotalDocuments { get; set; } = totalDocuments;
 	public bool IsFirstPage { get; set; } = IsFirst;
-	public bool IsLastPage { get; set; } = IsLast; 
+	public bool IsLastPage { get; set; } = IsLast;
 	public List<FeedbackModel> Documents { get; set; } = documents;
 }
 public static class PaginationHelper
 {
-	public static int PageNumberValidator(int page, int totalPages)
+	public static int ValidatePageNumber(int page, int totalPages)
 	{
 		int correctPage = 1;
 		if (page > totalPages)
@@ -186,7 +189,7 @@ public static class PaginationHelper
 		return correctPage;
 	}
 
-	public static int NumberOfDocumentsPerPageValidator(int documentsLimitPerPage)
+	public static int ValidateLimitPerPage(int documentsLimitPerPage)
 	{
 		int correctNumberOfDocuments = documentsLimitPerPage switch
 		{
@@ -198,8 +201,8 @@ public static class PaginationHelper
 
 	}
 
-	public static bool IsFirst(int pageNumber, int totalPages) => pageNumber == 1 || totalPages == 1;
-	public static bool IsLast(int pageNumber, int totalPages) => pageNumber >= totalPages;
-	public static int CountPages(long totalDocuments, int documentsLimit) => (int)Math.Ceiling((double)totalDocuments / documentsLimit);
+	public static bool IsFirstPage(int pageNumber, int totalPages) => pageNumber == 1 || totalPages == 1;
+	public static bool IsLastPage(int pageNumber, int totalPages) => pageNumber >= totalPages;
+	public static int CalculateTotalPages(long totalDocuments, int documentsLimit) => (int)Math.Ceiling((double)totalDocuments / documentsLimit);
 }
 
