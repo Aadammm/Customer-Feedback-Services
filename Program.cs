@@ -7,10 +7,10 @@ using MongoDB.Driver;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-builder.Services.Configure<FeedBackDatabaseSettings>(
+builder.Services.Configure<FeedbackDatabaseSettings>(
 	builder.Configuration.GetSection("FeedbackDatabase"));
 
-builder.Services.AddSingleton<FeedBackService>();
+builder.Services.AddSingleton<FeedbackService>();
 builder.Services.AddControllers();
 
 var app = builder.Build();
@@ -29,32 +29,32 @@ app.Run();
 [Route("[controller]")]
 public class FeedbackController : ControllerBase
 {
-	private readonly FeedBackService _feedbackService;
-	public FeedbackController(FeedBackService feedbackService) =>
+	private readonly FeedbackService _feedbackService;
+	public FeedbackController(FeedbackService feedbackService) =>
 		_feedbackService = feedbackService;
 
 	[HttpGet]
 	[Route("")]
 	[Route("page={pageNumber}")]
 	[Route("page={pageNumber}&perPage={documentsLimitPerPage}")]
-	public Page Get(int pageNumber, int documentsLimitPerPage = 10)
+	public PageResult Get(int pageNumber, int limitPerPage = 10)
 	{
 		long totalDocuments = _feedbackService.CountDocuments();
-		int documentsLimit = FilterValidator.NumberOfDocumentsPerPageValidator(documentsLimitPerPage);
+		int documentsLimit = PaginationHelper.NumberOfDocumentsPerPageValidator(limitPerPage);
 
-		int totalPages = FilterValidator.CountPages(totalDocuments, documentsLimit);
-		int page = FilterValidator.PageNumberValidator(pageNumber, totalPages);
+		int totalPages = PaginationHelper.CountPages(totalDocuments, documentsLimit);
+		int page = PaginationHelper.PageNumberValidator(pageNumber, totalPages);
 
-		bool isFirst = FilterValidator.IsFirst(pageNumber, totalPages);
-		bool isLast = FilterValidator.IsLast(pageNumber, totalPages);
+		bool isFirst = PaginationHelper.IsFirst(pageNumber, totalPages);
+		bool isLast = PaginationHelper.IsLast(pageNumber, totalPages);
 
 		var documents = _feedbackService.GetLimitedDocuments(page, documentsLimit).ToList();
 
-		return new Page(totalDocuments, isFirst, isLast, documents);
+		return new PageResult(totalDocuments, isFirst, isLast, documents) ;
 	}
 
 	[HttpGet("{id:length(24)}")]
-	public ActionResult<FeedBackModel> Get(string id)
+	public ActionResult<FeedbackModel> Get(string id)
 	{
 		var feedbackModel = _feedbackService.GetDocumentById(id);
 
@@ -66,7 +66,7 @@ public class FeedbackController : ControllerBase
 	}
 
 	[HttpPost]
-	public IActionResult Post(FeedBackModel newFeedback)
+	public IActionResult Post(FeedbackModel newFeedback)
 	{
 		_feedbackService.CreateDocument(newFeedback);
 		return CreatedAtAction(nameof(Get), new { id = newFeedback.Id }, newFeedback);
@@ -74,7 +74,7 @@ public class FeedbackController : ControllerBase
 
 	[HttpPut]
 	[HttpPut("{id:length(24)}")]
-	public IActionResult Update(string id, FeedBackModel updatedFeedback)
+	public IActionResult Update(string id, FeedbackModel updatedFeedback)
 	{
 		var feedback = _feedbackService.GetDocumentById(id);
 		if (feedback is null)
@@ -97,15 +97,15 @@ public class FeedbackController : ControllerBase
 			return NotFound();
 		}
 
-		_feedbackService.RemoveAsync(id);
+		_feedbackService.Remove(id);
 		return NoContent();
 	}
 }
 
-public class FeedBackService
+public class FeedbackService
 {
-	private readonly IMongoCollection<FeedBackModel> _feedbacksCollection;
-	public FeedBackService(IOptions<FeedBackDatabaseSettings> feedBackDatabaseSettings)
+	private readonly IMongoCollection<FeedbackModel> _feedbacksCollection;
+	public FeedbackService(IOptions<FeedbackDatabaseSettings> feedBackDatabaseSettings)
 	{
 		var mongoClient = new MongoClient(
 			feedBackDatabaseSettings.Value.ConnectionString);
@@ -113,30 +113,30 @@ public class FeedBackService
 		var mongoDb = mongoClient.GetDatabase(
 			feedBackDatabaseSettings.Value.DatabaseName);
 
-		_feedbacksCollection = mongoDb.GetCollection<FeedBackModel>(
+		_feedbacksCollection = mongoDb.GetCollection<FeedbackModel>(
 			feedBackDatabaseSettings.Value.CollectionName);
 	}
 
-	public IEnumerable<FeedBackModel> GetDocuments() =>
+	public IEnumerable<FeedbackModel> GetDocuments() =>
 		 _feedbacksCollection.Find(FeedBackModel => true).ToList();
 
-	public IEnumerable<FeedBackModel> GetLimitedDocuments(int pageNumber, int documentsLimitPerPage)
+	public IEnumerable<FeedbackModel> GetLimitedDocuments(int pageNumber, int documentsLimitPerPage)
 	{
 		int skipDocumentsCalculate = pageNumber == 1 ? 0 : (pageNumber * documentsLimitPerPage) - 1;
 		return _feedbacksCollection.Find(FeedBackModel => true).Skip(skipDocumentsCalculate).Limit(documentsLimitPerPage)
 			.SortByDescending(feedback => feedback.Id).ToList();
 	}
 
-	public FeedBackModel GetDocumentById(string id) =>
+	public FeedbackModel GetDocumentById(string id) =>
 		 _feedbacksCollection.Find(x => x.Id == id).FirstOrDefault();
 
-	public void CreateDocument(FeedBackModel newFeedBackModel) =>
+	public void CreateDocument(FeedbackModel newFeedBackModel) =>
 		 _feedbacksCollection.InsertOne(newFeedBackModel);
 
-	public void Update(string id, FeedBackModel updateFeedback) =>
+	public void Update(string id, FeedbackModel updateFeedback) =>
 		_feedbacksCollection.ReplaceOne(x => x.Id == id, updateFeedback);
 
-	public void RemoveAsync(string id) =>
+	public void Remove(string id) =>
 	 _feedbacksCollection.DeleteOne(x => x.Id == id);
 
 	public long CountDocuments() =>
@@ -144,7 +144,7 @@ public class FeedBackService
 
 }
 
-public class FeedBackDatabaseSettings
+public class FeedbackDatabaseSettings
 {
 	public string ConnectionString { get; set; } = null!;
 
@@ -152,7 +152,7 @@ public class FeedBackDatabaseSettings
 
 	public string CollectionName { get; set; } = null!;
 }
-public class FeedBackModel
+public class FeedbackModel
 {
 	[BsonId]
 	[BsonRepresentation(BsonType.ObjectId)]
@@ -163,14 +163,14 @@ public class FeedBackModel
 	public required string Product { get; set; }
 	public required string Vendor { get; set; }
 }
-public class Page(long totalDocuments, bool IsFirst, bool IsLast, List<FeedBackModel> documents)
+public class PageResult(long totalDocuments, bool IsFirst, bool IsLast, List<FeedbackModel> documents)
 {
 	public long TotalDocuments { get; set; } = totalDocuments;
 	public bool IsFirstPage { get; set; } = IsFirst;
 	public bool IsLastPage { get; set; } = IsLast; 
-	public List<FeedBackModel> Documents { get; set; } = documents;
+	public List<FeedbackModel> Documents { get; set; } = documents;
 }
-public static class FilterValidator
+public static class PaginationHelper
 {
 	public static int PageNumberValidator(int page, int totalPages)
 	{
@@ -202,5 +202,4 @@ public static class FilterValidator
 	public static bool IsLast(int pageNumber, int totalPages) => pageNumber >= totalPages;
 	public static int CountPages(long totalDocuments, int documentsLimit) => (int)Math.Ceiling((double)totalDocuments / documentsLimit);
 }
-//ked sa zada page vacsi ako pocetPage zobrazi sa posledna a ak je posledna zaroven prva musi byt atribut true a musia sa zobrazit aj dokumenty
 
