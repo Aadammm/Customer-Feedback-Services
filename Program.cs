@@ -67,6 +67,10 @@ public class FeedbackController : ControllerBase
 	public IActionResult Post(FeedbackModel newFeedback)//rating moze byt 1 az 5 
 	{
 		_feedbackService.CreateDocument(newFeedback);
+		if (newFeedback.Rating > 5 || newFeedback.Rating < 0)
+		{
+			return BadRequest("Rating must be within the correct range from 0 to 5");
+		}
 		return CreatedAtAction(nameof(Get), new { id = newFeedback.Id }, newFeedback);
 	}
 
