@@ -30,14 +30,12 @@ app.Run();
 public class FeedbackController : ControllerBase
 {
 	private readonly FeedbackService _feedbackService;
+
 	public FeedbackController(FeedbackService feedbackService) =>
 		_feedbackService = feedbackService;
 
 	[HttpGet]
-	[Route("")]
-	[Route("page={pageNumber}")]
-	[Route("page={pageNumber}&perPage={documentsLimitPerPage}")]
-	public PageResult Get(int pageNumber, int limitPerPage = 10)
+	public PageResult Get(int pageNumber = 1, int limitPerPage = 10, string customerName = "", int? rating = null)
 	{
 		long totalDocuments = _feedbackService.CountDocuments();
 		int documentsLimit = PaginationHelper.ValidateLimitPerPage(limitPerPage);
@@ -48,9 +46,9 @@ public class FeedbackController : ControllerBase
 		bool isFirst = PaginationHelper.IsFirstPage(pageNumber, totalPages);
 		bool isLast = PaginationHelper.IsLastPage(pageNumber, totalPages);
 
-		var documents = _feedbackService.GetLimitedDocuments(page, documentsLimit).ToList();
-
-		return new PageResult(totalDocuments, isFirst, isLast, documents);
+		var documents = _feedbackService.GetDocuments(page, documentsLimit, customerName, rating).ToList();
+		var countCoduments = documents.Count;
+		return new PageResult(countCoduments, isFirst, isLast, documents);
 	}
 
 	[HttpGet("{id:length(24)}")]
@@ -66,7 +64,7 @@ public class FeedbackController : ControllerBase
 	}
 
 	[HttpPost]
-	public IActionResult Post(FeedbackModel newFeedback)
+	public IActionResult Post(FeedbackModel newFeedback)//rating moze byt 1 az 5 
 	{
 		_feedbackService.CreateDocument(newFeedback);
 		return CreatedAtAction(nameof(Get), new { id = newFeedback.Id }, newFeedback);
@@ -120,16 +118,30 @@ public class FeedbackService
 	public IEnumerable<FeedbackModel> GetDocuments() =>
 		 _feedbacksCollection.Find(_ => true).ToList();
 
-	public IEnumerable<FeedbackModel> GetLimitedDocuments(int pageNumber, int documentsLimitPerPage)
+	public IEnumerable<FeedbackModel> GetDocuments(int pageNumber, int documentsLimitPerPage, string name, int? rating)
 	{
 		int skipDocuments = pageNumber == 1 ? 0 : (pageNumber * documentsLimitPerPage) - 1;
-		return _feedbacksCollection.Find(FeedBackModel => true)
+		var filter = FilterByNameAndRating(name, rating);
+		return _feedbacksCollection.Find(filter)
 			.Skip(skipDocuments)
 			.Limit(documentsLimitPerPage)
 			.SortByDescending(feedback => feedback.Id)
 			.ToList();
 	}
-
+	private FilterDefinition<FeedbackModel> FilterByNameAndRating(string name, int? rating)
+	{
+		var builder = Builders<FeedbackModel>.Filter;
+		var filter = builder.Empty;
+		if (!string.IsNullOrWhiteSpace(name))
+		{
+			filter &= builder.Eq(x => x.Customer, name);
+		}
+		else if (rating is not null)
+		{
+			filter &= builder.Eq(x => x.Rating, rating);
+		}
+		return filter;
+	}
 	public FeedbackModel GetDocumentById(string id) =>
 		 _feedbacksCollection.Find(x => x.Id == id).FirstOrDefault();
 
