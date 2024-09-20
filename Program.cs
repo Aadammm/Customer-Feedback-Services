@@ -64,7 +64,7 @@ public class FeedbackController : ControllerBase
 	}
 
 	[HttpPost]
-	public IActionResult Post(FeedbackModel newFeedback)//rating moze byt 1 az 5 
+	public IActionResult Post(FeedbackModel newFeedback)
 	{
 		_feedbackService.CreateDocument(newFeedback);
 		if (newFeedback.Rating > 5 || newFeedback.Rating < 0)
