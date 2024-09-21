@@ -1,4 +1,10 @@
-var builder = WebApplication.CreateBuilder(args);
+using Customer_Feedback_Services.Configuration;
+using Customer_Feedback_Services.Services;
+
+var builder = WebApplication.CreateBuilder(args); 
+
+builder.Configuration.SetBasePath(Directory.GetCurrentDirectory() + "/Configuration");
+builder.Configuration.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
 
 // Add services to the container.
 builder.Services.Configure<FeedbackDatabaseSettings>(
