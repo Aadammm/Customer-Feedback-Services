@@ -24,17 +24,12 @@ namespace Customer_Feedback_Services.Services
 		public IEnumerable<FeedbackModel> GetDocuments() =>
 			 _feedbacksCollection.Find(_ => true).ToList();
 
-		public IEnumerable<FeedbackModel> GetDocuments(int pageNumber, int documentsLimitPerPage, string name, int? rating)
+		public List<FeedbackModel> GetDocuments( string name, int? rating, string produkt)
 		{
-			int skipDocuments = pageNumber == 1 ? 0 : pageNumber * documentsLimitPerPage - 1;
-			var filter = CreateFilter(name, rating);
-			return _feedbacksCollection.Find(filter)
-				.Skip(skipDocuments)
-				.Limit(documentsLimitPerPage)
-				.SortByDescending(feedback => feedback.Id)
-				.ToList();
+			var filter = CreateFilter(name, rating, produkt);
+			return  _feedbacksCollection.Find(filter).ToList();
 		}
-		private FilterDefinition<FeedbackModel> CreateFilter(string name, int? rating)
+		private FilterDefinition<FeedbackModel> CreateFilter(string name, int? rating, string produkt)
 		{
 			var builder = Builders<FeedbackModel>.Filter;
 			var filter = builder.Empty;
@@ -42,9 +37,13 @@ namespace Customer_Feedback_Services.Services
 			{
 				filter &= builder.Eq(x => x.Customer, name);
 			}
-			else if (rating is not null)
+			if (!string.IsNullOrWhiteSpace(produkt))
 			{
-				filter &= builder.Eq(x => x.Rating, rating);
+				filter &= builder.Eq(x => x.Product, produkt);
+			}
+			if (rating is not null)
+			{
+				filter &= builder.Eq(x => x.Rating, rating.Value);
 			}
 			return filter;
 		}

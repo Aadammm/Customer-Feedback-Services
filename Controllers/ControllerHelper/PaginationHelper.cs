@@ -4,29 +4,29 @@
 	{
 		if (page > totalPages)
 		{
-			return totalPages;
+			page= totalPages;
 		}
-		else if (page < 1)
+		 if (page < 1)
 		{
-			return 1;
+			page =1;
 		}
 		return page;
 	}
 
-	public static int ValidateLimitPerPage(int documentsLimitPerPage)
+	public static int ValidateLimitPerPage(int perPageLimit)
 	{
-		int correctNumberOfDocuments = documentsLimitPerPage switch
+		int correctNumberOfDocuments = perPageLimit switch
 		{
 			> 20 => 20,
 			< 5 => 5,
-			_ => documentsLimitPerPage,
+			_ => perPageLimit,
 		};
 		return correctNumberOfDocuments;
 
 	}
 
-	public static bool IsFirstPage(int pageNumber, int totalPages) => pageNumber == 1 || totalPages == 1;
-	public static bool IsLastPage(int pageNumber, int totalPages) => pageNumber == totalPages;
+	public static bool IsFirstPage(int? pageNumber, int totalPages) => pageNumber == 1 ;
+	public static bool IsLastPage(int? pageNumber, int totalPages) => pageNumber >= totalPages;
 	public static int CalculateTotalPages(long totalDocuments, int documentsLimit) => (int)Math.Ceiling((double)totalDocuments / documentsLimit);
 }
 

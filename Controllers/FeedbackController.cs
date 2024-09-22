@@ -1,6 +1,7 @@
 ﻿using Customer_Feedback_Services.Models;
 using Customer_Feedback_Services.Services;
 using Microsoft.AspNetCore.Mvc;
+using MongoDB.Bson;
 using MongoDB.Driver;
 
 namespace Customer_Feedback_Services.Controllers
@@ -15,20 +16,23 @@ namespace Customer_Feedback_Services.Controllers
 			_feedbackService = feedbackService;
 
 		[HttpGet]
-		public PageResult Get(int pageNumber = 1, int limitPerPage = 10, string customerName = "", int? rating = null)
+		public PageResult Get(int page = 1, int perPage = 10, string name = "", int? rating = null, string produkt = "")
 		{
-			long totalDocuments = _feedbackService.CountDocuments();
-			int documentsLimit = PaginationHelper.ValidateLimitPerPage(limitPerPage);
+			var documents = _feedbackService.GetDocuments(name, rating, produkt);
+			var countCoduments = documents.Count;
 
-			int totalPages = PaginationHelper.CalculateTotalPages(totalDocuments, documentsLimit);
-			int page = PaginationHelper.ValidatePageNumber(pageNumber, totalPages);
+			int documentsLimit = PaginationHelper.ValidateLimitPerPage(perPage);
+			int totalPages = PaginationHelper.CalculateTotalPages(countCoduments, documentsLimit);
+			int pageNumber = PaginationHelper.ValidatePageNumber(page, totalPages);
 
 			bool isFirst = PaginationHelper.IsFirstPage(pageNumber, totalPages);
 			bool isLast = PaginationHelper.IsLastPage(pageNumber, totalPages);
 
-			var documents = _feedbackService.GetDocuments(page, documentsLimit, customerName, rating).ToList();
-			var countCoduments = documents.Count;
-			return new PageResult(countCoduments, isFirst, isLast, documents);
+			var result = documents.Skip((pageNumber-1 )* documentsLimit)
+					.Take(documentsLimit)
+					.OrderByDescending(x=>x.Id).ToList();
+
+			return new PageResult(countCoduments, isFirst, isLast, result);
 		}
 
 		[HttpGet("{id:length(24)}")]
